@@ -153,4 +153,4 @@ GitHub Actions 在 **Linux / macOS / Windows** 三个平台执行 `cargo build -
 
 ## License
 
-AGPL-3.0
+Apache 2.0
