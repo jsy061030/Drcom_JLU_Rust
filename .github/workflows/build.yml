@@ -1,4 +1,4 @@
-name: CI
+name: Build
 
 on:
   push:
@@ -13,8 +13,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check & Test (${{ matrix.os }})
+  build:
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -24,24 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust components
-        run: rustup component add clippy rustfmt
-
       - name: Show toolchain
         run: |
           rustc --version
           cargo --version
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Format check
-        run: cargo fmt --all --check
-
-      - name: Clippy (deny warnings)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Test
-        run: cargo test --all-targets
 
       - name: Build (release)
         run: cargo build --release

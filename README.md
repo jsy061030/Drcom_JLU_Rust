@@ -1,7 +1,6 @@
 # drcom-client
 
-[![CI](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/ci.yml/badge.svg)](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/ci.yml)
-[![C ABI](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/c-abi.yml/badge.svg)](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/c-abi.yml)
+[![Build](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/build.yml/badge.svg)](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/build.yml)
 
 Dr.COM 校园网认证客户端的 Rust 重写版本，提供**可执行文件**、**Rust 库**和 **C 库**三种形式。
 
@@ -143,41 +142,10 @@ cargo run --release -- /path/to/config.toml
 Rust / C# 实现的 `md5sum`、`dump`、`checksum`、`mkpkt`、`keep_alive_package_builder`
 输出已与原 Python 脚本逐字节比对通过（相同输入 → 完全相同的报文）。
 
-## 持续集成与发布
+## 跨平台构建
 
-项目在 GitHub Actions 上跨平台（Linux / macOS / Windows）验证与构建：
-
-| 工作流 | 文件 | 触发 | 内容 |
-|--------|------|------|------|
-| **CI** | `.github/workflows/ci.yml` | push / PR | `cargo fmt --check`、`clippy -D warnings`、`cargo test`、`cargo build --release` |
-| **C ABI** | `.github/workflows/c-abi.yml` | push / PR | 构建 cdylib/staticlib，用 `cc`/`cl` 编译 `c-smoke/smoke.c` 并运行，验证 C 接口 |
-| **Release** | `.github/workflows/release.yml` | tag `v*` / 手动 | 构建 4 个目标（linux-x64 / mac-arm64 / mac-x64 / win-x64）并打包上传；打 tag 时自动创建 GitHub Release |
-
-发布示例：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-### 本地运行 C 冒烟测试
-
-```bash
-cargo build --release --lib
-
-# Linux
-cc -Wall -Wextra -Iinclude c-smoke/smoke.c -Ltarget/release -ldrcom -lpthread -ldl -lm -o c-smoke/smoke
-LD_LIBRARY_PATH=target/release ./c-smoke/smoke
-
-# macOS
-cc -Wall -Wextra -Iinclude c-smoke/smoke.c -Ltarget/release -ldrcom -o c-smoke/smoke
-DYLD_LIBRARY_PATH=target/release ./c-smoke/smoke
-
-# Windows (MSVC 开发者命令行)
-cl /nologo /W4 /Iinclude c-smoke\smoke.c /link target\release\drcom.dll.lib
-copy target\release\drcom.dll .
-smoke.exe
-```
+GitHub Actions 在 **Linux / macOS / Windows** 三个平台执行 `cargo build --release`
+（见 `.github/workflows/build.yml`），在 push 到 `main` 或提交 PR 时自动运行。
 
 ## 安全提醒
 
