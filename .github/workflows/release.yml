@@ -1,0 +1,63 @@
+name: Release
+
+# 监听 Build 工作流：当 main 分支的构建成功后，自动发布 release
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write   # 创建 release / tag
+  actions: read     # 下载 Build 的产物
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout (构建所用的提交)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: artifacts
+
+      - name: Package archives
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for dir in artifacts/*/; do
+            name="$(basename "${dir}")"
+            work="pkg/${name}"
+            mkdir -p "${work}"
+            cp -r "${dir}". "${work}/"
+            cp include/drcom.h drcom.toml.example README.md LIBRARY_USAGE.md C_API.md "${work}/"
+            ( cd "${work}" && zip -r "${GITHUB_WORKSPACE}/out/${name}.zip" . )
+          done
+          echo "--- archives ---"
+          ls -la out
+
+      - name: Compute tag
+        id: tag
+        run: |
+          set -euo pipefail
+          short="$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)"
+          echo "tag=v$(date -u +%Y.%m.%d)-${short}" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.event.workflow_run.head_sha }}
+          files: out/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: false

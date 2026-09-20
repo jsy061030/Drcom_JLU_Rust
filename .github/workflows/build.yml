@@ -31,3 +31,20 @@ jobs:
 
       - name: Build (release)
         run: cargo build --release
+
+      # 产物：CLI 二进制 + C 动态库/静态库/导入库
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: drcom-${{ matrix.os }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            target/release/drcom-client
+            target/release/drcom-client.exe
+            target/release/libdrcom.so
+            target/release/libdrcom.dylib
+            target/release/drcom.dll
+            target/release/drcom.dll.lib
+            target/release/drcom.lib
+            target/release/libdrcom.a
