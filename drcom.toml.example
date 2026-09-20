@@ -1,0 +1,16 @@
+# Dr.COM 认证配置示例
+# 复制此文件并修改为你的实际信息
+
+server = "10.100.61.3"
+username = "your_username"
+password = "your_password"
+host_ip = "192.168.1.2"
+mac = "AA:BB:CC:DD:EE:FF"
+
+# 可选配置（取消注释并修改）
+# host_name = "YOURPCNAME"
+# primary_dns = "10.10.10.10"
+# dhcp_server = "0.0.0.0"
+# bind_ip = "0.0.0.0"
+# is_test = true
+# unlimited_retry = true

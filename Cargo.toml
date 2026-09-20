@@ -1,0 +1,26 @@
+[package]
+name = "drcom-client"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0"
+
+[lib]
+name = "drcom"
+path = "src/lib.rs"
+# rlib 供 Rust 二进制使用；cdylib/staticlib 提供 C ABI，供 C/C++/C#/Python 等调用
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "drcom-client"
+path = "src/main.rs"
+
+[dependencies]
+md-5 = "0.10"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[lints.rust]
+# 生成 cdylib 时 MSVC link.exe 会打印"正在创建库 drcom.dll.lib"之类的信息，
+# 属正常现象，这里关闭该提醒以保持构建输出整洁。
+linker_messages = "allow"
