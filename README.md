@@ -47,9 +47,7 @@ cargo build --release
 | `drcom.dll.lib` | Windows 动态库导入库 |
 | `drcom.lib` / `libdrcom.a` | C 静态库（staticlib） |
 
-> **注意**: 某些 Windows 环境下（如使用 `x86_64-pc-windows-gnullvm` 目标），
-> 可能因缺少 MinGW-w64 系统库导致链接失败。建议切换至 `x86_64-pc-windows-msvc`
-> 目标并确保安装了 Visual Studio Build Tools。
+> **注意**: Windows平台仅测试了x86_64-pc-windows-msvc target，gnu目标可以试一试，不建议用gnullvm目标。对于arm64的目标，本人没有机器呢（）
 
 > **构建时若提示无法替换 `drcom-client.exe`（拒绝访问）**：说明上次运行的客户端
 > 进程仍在后台占用该文件，先用任务管理器或 `taskkill /PID <pid> /F` 结束它再构建。
@@ -152,32 +150,6 @@ GitHub Actions 在 **Linux / macOS / Windows** 三个平台执行 `cargo build -
 - 配置文件中包含明文密码，请妥善保管。
 - 建议将配置文件加入 `.gitignore`。
 
-## 故障排查
-
-### `failed to select a version for the requirement ...`（国内镜像索引滞后）
-
-使用 crates.io 镜像（aliyun / 清华 / 中科大等）时，镜像索引可能比官方晚几天，
-若 `Cargo.lock` 锁定的最新版本镜像里还没有，就会报这个错。
-
-处理方式（任选其一）：
-
-1. 让 cargo 按当前镜像重新解析（会改写本地 `Cargo.lock`）：
-
-   ```bash
-   rm Cargo.lock && cargo build
-   ```
-
-2. 只把缺失的 crate 降级到镜像中已有的版本：
-
-   ```bash
-   cargo update -p cfg-if --precise 1.0.4
-   # syn 存在多个大版本时需指定，例如：
-   cargo update -p syn@3.0.6 --precise 3.0.5
-   ```
-
-3. 改用官方源（可配合代理）。
-
-> 仓库中的 `Cargo.lock` 已对齐 aliyun 镜像的可用版本，正常情况下国内镜像可直接构建。
 
 ## License
 
