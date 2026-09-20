@@ -1,0 +1,59 @@
+name: C ABI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  smoke:
+    name: C ABI smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Swatinem/rust-cache@v2
+
+      # 构建 cdylib + staticlib + rlib + CLI
+      - name: Build C library
+        run: cargo build --release --lib
+
+      - name: Compile & run (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          cc -Wall -Wextra -Iinclude c-smoke/smoke.c \
+             -Ltarget/release -ldrcom -lpthread -ldl -lm -o c-smoke/smoke
+          LD_LIBRARY_PATH=target/release ./c-smoke/smoke
+
+      - name: Compile & run (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euxo pipefail
+          cc -Wall -Wextra -Iinclude c-smoke/smoke.c \
+             -Ltarget/release -ldrcom -o c-smoke/smoke
+          DYLD_LIBRARY_PATH=target/release ./c-smoke/smoke
+
+      - name: Setup MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Compile & run (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          cl /nologo /W4 /Iinclude c-smoke\smoke.c /link target\release\drcom.dll.lib
+          copy /Y target\release\drcom.dll . >nul
+          smoke.exe

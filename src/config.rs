@@ -56,17 +56,39 @@ pub struct Config {
     pub unlimited_retry: bool,
 }
 
-fn default_host_name() -> String { "YOURPCNAME".into() }
-fn default_primary_dns() -> String { "10.10.10.10".into() }
-fn default_dhcp_server() -> String { "0.0.0.0".into() }
-fn default_bind_ip() -> String { "0.0.0.0".into() }
-fn default_control_check_status() -> String { "20".into() }
-fn default_adapter_num() -> String { "03".into() }
-fn default_ip_dog() -> String { "01".into() }
-fn default_auth_version() -> String { "68 00".into() }
-fn default_keep_alive_version() -> String { "dc 02".into() }
-fn default_is_test() -> bool { true }
-fn default_unlimited_retry() -> bool { true }
+fn default_host_name() -> String {
+    "YOURPCNAME".into()
+}
+fn default_primary_dns() -> String {
+    "10.10.10.10".into()
+}
+fn default_dhcp_server() -> String {
+    "0.0.0.0".into()
+}
+fn default_bind_ip() -> String {
+    "0.0.0.0".into()
+}
+fn default_control_check_status() -> String {
+    "20".into()
+}
+fn default_adapter_num() -> String {
+    "03".into()
+}
+fn default_ip_dog() -> String {
+    "01".into()
+}
+fn default_auth_version() -> String {
+    "68 00".into()
+}
+fn default_keep_alive_version() -> String {
+    "dc 02".into()
+}
+fn default_is_test() -> bool {
+    true
+}
+fn default_unlimited_retry() -> bool {
+    true
+}
 
 impl Config {
     /// 从 TOML 文件加载配置。
@@ -91,9 +113,9 @@ impl Config {
             if i >= 4 {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid IPv4"));
             }
-            bytes[i] = part
-                .parse::<u8>()
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("invalid IPv4: {e}")))?;
+            bytes[i] = part.parse::<u8>().map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("invalid IPv4: {e}"))
+            })?;
         }
         Ok(bytes)
     }

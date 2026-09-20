@@ -236,7 +236,10 @@ pub unsafe extern "C" fn drcom_client_free(client: *mut DrcomClient) {
 ///
 /// `client` 必须是有效句柄，`field` 必须是有效的 NUL 结尾 UTF-8 字符串。
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn drcom_config_get(client: *mut DrcomClient, field: *const c_char) -> *mut c_char {
+pub unsafe extern "C" fn drcom_config_get(
+    client: *mut DrcomClient,
+    field: *const c_char,
+) -> *mut c_char {
     if client.is_null() {
         set_last_error("null client handle");
         return ptr::null_mut();

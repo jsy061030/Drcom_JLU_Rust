@@ -125,7 +125,7 @@ pub fn keep_alive_package_builder(
 
     if pkg_type == 3 {
         data.extend_from_slice(&[0x00; 4]); // CRC 置零
-        data.extend_from_slice(&host_ip);   // 本机 IP
+        data.extend_from_slice(&host_ip); // 本机 IP
         data.extend_from_slice(&[0x00; 8]);
     } else {
         data.extend_from_slice(&[0x00; 16]);
@@ -173,7 +173,13 @@ pub fn logout(usr: &[u8], mac: u64, config: &Config) -> io::Result<Vec<u8>> {
 }
 
 /// 构造登录报文，对应 Python 脚本中的 `mkpkt()`。
-pub fn mkpkt(salt: &[u8; 4], usr: &[u8], pwd: &[u8], mac: u64, config: &Config) -> io::Result<Vec<u8>> {
+pub fn mkpkt(
+    salt: &[u8; 4],
+    usr: &[u8],
+    pwd: &[u8],
+    mac: u64,
+    config: &Config,
+) -> io::Result<Vec<u8>> {
     let control_check_status = config.parse_hex(&config.control_check_status)?;
     let adapter_num = config.parse_hex(&config.adapter_num)?;
     let ip_dog = config.parse_hex(&config.ip_dog)?;
@@ -205,10 +211,8 @@ pub fn mkpkt(salt: &[u8; 4], usr: &[u8], pwd: &[u8], mac: u64, config: &Config) 
     data.extend_from_slice(&adapter_num);
 
     // mac xor md51[0:6]
-    let md51_part = u64::from_be_bytes([
-        0, 0,
-        md51[0], md51[1], md51[2], md51[3], md51[4], md51[5],
-    ]);
+    let md51_part =
+        u64::from_be_bytes([0, 0, md51[0], md51[1], md51[2], md51[3], md51[4], md51[5]]);
     let xor_val = md51_part ^ mac;
     let xor_bytes = dump(xor_val);
     let mut xor_padded = vec![0u8; 6];
@@ -329,7 +333,10 @@ dhcp_server = "0.0.0.0"
 
     #[test]
     fn md5_and_dump() {
-        assert_eq!(to_hex(&md5sum(b"hello")), "5d41402abc4b2a76b9719d911017c592");
+        assert_eq!(
+            to_hex(&md5sum(b"hello")),
+            "5d41402abc4b2a76b9719d911017c592"
+        );
         assert_eq!(to_hex(&dump(0)), "00");
         assert_eq!(to_hex(&dump(255)), "ff");
         assert_eq!(to_hex(&dump(256)), "0100");

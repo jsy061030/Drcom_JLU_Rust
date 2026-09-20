@@ -1,1 +1,7 @@
 /target
+
+# C ABI 冒烟测试的本地构建产物
+/c-smoke/smoke
+/c-smoke/smoke.exe
+/c-smoke/drcom.dll
+/c-smoke/*.o

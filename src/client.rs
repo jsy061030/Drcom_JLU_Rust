@@ -8,7 +8,10 @@ use crate::protocol::{dump, keep_alive_package_builder, logout, md5sum, mkpkt};
 use rand::Rng;
 use std::io;
 use std::net::{SocketAddr, UdpSocket};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -40,7 +43,12 @@ impl Client {
         socket.set_read_timeout(Some(Duration::from_secs(3)))?;
         let svr_addr: SocketAddr = format!("{}:{}", config.server, SERVER_PORT)
             .parse()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("bad server address: {e}")))?;
+            .map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("bad server address: {e}"),
+                )
+            })?;
         Ok(Self {
             config,
             socket,
@@ -141,7 +149,9 @@ impl Client {
                 }
             }
             Ok(_) => {}
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+            Err(e)
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
+            {
                 println!("未收到注销响应（可能已离线）");
             }
             Err(e) => return Err(e),
@@ -278,7 +288,12 @@ impl Client {
         Ok(())
     }
 
-    fn keep_alive2(&self, salt: &[u8; 4], package_tail: &[u8; 16], stop_flag: &Arc<AtomicBool>) -> io::Result<()> {
+    fn keep_alive2(
+        &self,
+        salt: &[u8; 4],
+        package_tail: &[u8; 16],
+        stop_flag: &Arc<AtomicBool>,
+    ) -> io::Result<()> {
         let _password = self.config.password.as_bytes();
         let host_ip = self.config.parse_ip(&self.config.host_ip)?;
         let keep_alive_version = self.config.parse_hex(&self.config.keep_alive_version)?;
@@ -288,7 +303,15 @@ impl Client {
         ran += rng.gen_range(1..=10) as u64;
 
         let mut svr_num: u8 = 0;
-        let mut packet = keep_alive_package_builder(svr_num, &dump(ran), &[0x00; 4], 1, true, host_ip, &keep_alive_version);
+        let mut packet = keep_alive_package_builder(
+            svr_num,
+            &dump(ran),
+            &[0x00; 4],
+            1,
+            true,
+            host_ip,
+            &keep_alive_version,
+        );
 
         loop {
             self.socket.send_to(&packet, self.svr_addr)?;
@@ -302,12 +325,28 @@ impl Client {
                 break;
             } else if !data.is_empty() && data[0] == 0x07 && data.len() > 2 && data[2] == 0x10 {
                 svr_num = svr_num.wrapping_add(1);
-                packet = keep_alive_package_builder(svr_num, &dump(ran), &[0x00; 4], 1, false, host_ip, &keep_alive_version);
+                packet = keep_alive_package_builder(
+                    svr_num,
+                    &dump(ran),
+                    &[0x00; 4],
+                    1,
+                    false,
+                    host_ip,
+                    &keep_alive_version,
+                );
             }
         }
 
         ran += rng.gen_range(1..=10) as u64;
-        packet = keep_alive_package_builder(svr_num, &dump(ran), &[0x00; 4], 1, false, host_ip, &keep_alive_version);
+        packet = keep_alive_package_builder(
+            svr_num,
+            &dump(ran),
+            &[0x00; 4],
+            1,
+            false,
+            host_ip,
+            &keep_alive_version,
+        );
         self.socket.send_to(&packet, self.svr_addr)?;
 
         let mut tail = [0u8; 4];
@@ -325,7 +364,15 @@ impl Client {
         }
 
         ran += rng.gen_range(1..=10) as u64;
-        packet = keep_alive_package_builder(svr_num, &dump(ran), &tail, 3, false, host_ip, &keep_alive_version);
+        packet = keep_alive_package_builder(
+            svr_num,
+            &dump(ran),
+            &tail,
+            3,
+            false,
+            host_ip,
+            &keep_alive_version,
+        );
         self.socket.send_to(&packet, self.svr_addr)?;
 
         loop {
@@ -350,7 +397,15 @@ impl Client {
 
             let result = (|| -> io::Result<()> {
                 ran += rng.gen_range(1..=10) as u64;
-                packet = keep_alive_package_builder(i, &dump(ran), &tail, 1, false, host_ip, &keep_alive_version);
+                packet = keep_alive_package_builder(
+                    i,
+                    &dump(ran),
+                    &tail,
+                    1,
+                    false,
+                    host_ip,
+                    &keep_alive_version,
+                );
                 self.socket.send_to(&packet, self.svr_addr)?;
 
                 let mut buf = [0u8; RECV_BUF_SIZE];
@@ -361,7 +416,15 @@ impl Client {
                 }
 
                 ran += rng.gen_range(1..=10) as u64;
-                packet = keep_alive_package_builder(i.wrapping_add(1), &dump(ran), &tail, 3, false, host_ip, &keep_alive_version);
+                packet = keep_alive_package_builder(
+                    i.wrapping_add(1),
+                    &dump(ran),
+                    &tail,
+                    3,
+                    false,
+                    host_ip,
+                    &keep_alive_version,
+                );
                 self.socket.send_to(&packet, self.svr_addr)?;
 
                 let (len, _) = self.socket.recv_from(&mut buf)?;
