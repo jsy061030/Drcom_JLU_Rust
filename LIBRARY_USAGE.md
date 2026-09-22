@@ -172,6 +172,33 @@ impl Client {
 注销报文由 [`protocol::logout`](#底层协议-api) 构造。由于原脚本未实现注销，
 该报文格式依据通用 Dr.COM 实现推导，若你的服务器不接受，请对照抓包调整。
 
+### 从其他线程停止
+
+`run_until_stopped()` 配合 `request_stop()` 可以在登录阶段取消：
+
+```rust
+use drcom::{Client, Config};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+
+fn main() -> std::io::Result<()> {
+    let client = Arc::new(Client::new(Config::from_file("drcom.toml")?)?);
+
+    let worker = {
+        let client = Arc::clone(&client);
+        thread::spawn(move || client.run_until_stopped())
+    };
+
+    thread::sleep(Duration::from_secs(1));
+    client.request_stop();      // 登录阶段也可取消，最长等一次 3 秒读超时
+    worker.join().unwrap()?;
+    Ok(())
+}
+```
+
+登录前取消返回 `Ok(())`，不会发送注销报文；登录后取消会先发送注销报文再返回。
+
 ### 详细日志
 
 ```rust
@@ -186,6 +213,23 @@ fn main() -> std::io::Result<()> {
 ```
 
 启用 `verbose` 后会输出 Challenge / Login / KeepAlive 的十六进制报文，便于排查。
+
+## 网卡枚举
+
+`drcom::netif` 模块提供跨平台网卡枚举，可用于 WebUI 选择 MAC：
+
+```rust
+use drcom::netif;
+
+fn main() -> std::io::Result<()> {
+    for adapter in netif::usable_adapters()? {
+        println!("{} {:?} {:?}", adapter.name, adapter.mac, adapter.ipv4);
+    }
+    Ok(())
+}
+```
+
+`list_adapters()` 返回所有网卡；`usable_adapters()` 过滤掉 loopback 和无 MAC 的接口。
 
 ## 底层协议 API
 

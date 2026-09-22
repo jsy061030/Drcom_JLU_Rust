@@ -23,7 +23,12 @@
 pub mod client;
 pub mod config;
 pub mod ffi;
+pub mod netif;
 pub mod protocol;
+pub mod store;
+pub mod webui;
 
 pub use client::Client;
 pub use config::Config;
+pub use netif::AdapterInfo;
+pub use webui::WebUi;

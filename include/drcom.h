@@ -49,6 +49,13 @@ DRCOM_API void drcom_string_free(char *s);
 DRCOM_API drcom_client *drcom_client_from_file(const char *config_path);
 
 /*
+ * 从 TOML 字符串创建客户端（不经过配置文件）。
+ * 可选字段可省略并使用默认值。
+ * 成功返回句柄，失败返回 NULL。
+ */
+DRCOM_API drcom_client *drcom_client_new_from_toml(const char *toml_text);
+
+/*
  * 设置是否输出详细报文日志（verbose != 0 表示开启）。
  */
 DRCOM_API void drcom_client_set_verbose(drcom_client *client, int verbose);
@@ -85,6 +92,24 @@ DRCOM_API void drcom_client_free(drcom_client *client);
  * 未知字段返回 NULL。
  */
 DRCOM_API char *drcom_config_get(drcom_client *client, const char *field);
+
+/*
+ * 单个网卡信息。字段均为以 NUL 结尾的 UTF-8 字符串。
+ * 名称过长时会被截断。
+ */
+typedef struct drcom_adapter_info {
+    char name[256];
+    char mac[32];
+    char ipv4[16];
+} drcom_adapter_info;
+
+/*
+ * 列出可用于认证的本机网卡（排除 loopback 和无 MAC 的接口）。
+ * out: 调用方提供的数组；capacity: 数组元素个数。
+ * 返回找到的网卡总数（可能大于 capacity），失败返回 -1。
+ * 若 out 为 NULL 且 capacity 为 0，则只返回数量。
+ */
+DRCOM_API int drcom_adapters_list(drcom_adapter_info *out, int capacity);
 
 /*
  * 计算 MD5 摘要，写入 out（至少 16 字节）。

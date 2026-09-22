@@ -1,0 +1,5 @@
+server = "10.100.61.3"
+username = "test_user"
+password = "test_pass"
+host_ip = "192.168.1.2"
+mac = "AA:BB:CC:DD:EE:FF"

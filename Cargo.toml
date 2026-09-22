@@ -14,11 +14,26 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "drcom-client"
 path = "src/main.rs"
 
+[[bin]]
+name = "drcom-web"
+path = "src/web.rs"
+
+[[bin]]
+name = "drcom-tray"
+path = "src/tray.rs"
+
 [dependencies]
+dirs = "7"
 md-5 = "0.10"
+network-interface = "2.0.5"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tao = "0.37"
+tiny_http = "0.12"
 toml = "0.8"
+tray-icon = "0.25"
+webbrowser = "1"
 
 [lints.rust]
 # 生成 cdylib 时 MSVC link.exe 会打印"正在创建库 drcom.dll.lib"之类的信息，

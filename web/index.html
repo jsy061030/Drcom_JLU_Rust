@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dr.COM 校园网认证</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1f2329;
+    --muted: #6b7280;
+    --border: #d7dbe0;
+    --accent: #2563eb;
+    --danger: #dc2626;
+    --ok: #16a34a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --card: #1f2229;
+      --text: #e6e8eb;
+      --muted: #9aa1ab;
+      --border: #343943;
+      --accent: #4f8cff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .status-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .status-text { font-size: 16px; font-weight: 600; }
+  .status-text.ok { color: var(--ok); }
+  .status-text.bad { color: var(--danger); }
+  .muted { color: var(--muted); }
+  .grid {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px 12px;
+    align-items: center;
+  }
+  .grid label { color: var(--muted); }
+  input, select, button {
+    font: inherit;
+    color: inherit;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 9px;
+    width: 100%;
+  }
+  input:disabled, select:disabled { opacity: 0.6; }
+  button {
+    width: auto;
+    cursor: pointer;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+  }
+  button:disabled { cursor: not-allowed; opacity: 0.5; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row .grow { flex: 1; }
+  details { margin: 4px 0 12px; }
+  summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
+  pre.message {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--danger);
+    min-height: 1.5em;
+  }
+  .actions { display: flex; gap: 10px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dr.COM 校园网认证</h1>
+
+  <section class="card">
+    <div class="status-line">
+      <span id="status-text" class="status-text">未连接</span>
+      <span id="status-extra" class="muted"></span>
+    </div>
+    <pre id="message" class="message"></pre>
+  </section>
+
+  <section class="card">
+    <div class="grid">
+      <label for="server">认证服务器</label>
+      <input id="server" value="10.100.61.3" spellcheck="false">
+
+      <label for="username">账号</label>
+      <input id="username" autocomplete="username" spellcheck="false">
+
+      <label for="password">密码</label>
+      <input id="password" type="password" autocomplete="current-password">
+
+      <label for="adapter">网卡 / MAC</label>
+      <div class="row">
+        <select id="adapter" class="grow"></select>
+        <button id="refresh-adapters" class="secondary" type="button">刷新</button>
+      </div>
+
+      <label for="mac">MAC 地址</label>
+      <input id="mac" spellcheck="false">
+
+      <label for="host_ip">本机 IP</label>
+      <input id="host_ip" spellcheck="false">
+    </div>
+
+    <details>
+      <summary>高级选项</summary>
+      <div class="grid">
+        <label for="host_name">host_name</label>
+        <input id="host_name" spellcheck="false">
+
+        <label for="primary_dns">primary_dns</label>
+        <input id="primary_dns" spellcheck="false">
+
+        <label for="dhcp_server">dhcp_server</label>
+        <input id="dhcp_server" spellcheck="false">
+
+        <label for="bind_ip">bind_ip</label>
+        <input id="bind_ip" spellcheck="false">
+
+        <label for="control_check_status">control_check_status</label>
+        <input id="control_check_status" spellcheck="false">
+
+        <label for="adapter_num">adapter_num</label>
+        <input id="adapter_num" spellcheck="false">
+
+        <label for="ip_dog">ip_dog</label>
+        <input id="ip_dog" spellcheck="false">
+
+        <label for="auth_version">auth_version</label>
+        <input id="auth_version" spellcheck="false">
+
+        <label for="keep_alive_version">keep_alive_version</label>
+        <input id="keep_alive_version" spellcheck="false">
+
+        <label for="is_test">is_test</label>
+        <input id="is_test" type="checkbox">
+
+        <label for="unlimited_retry">unlimited_retry</label>
+        <input id="unlimited_retry" type="checkbox">
+
+        <label for="verbose">verbose</label>
+        <input id="verbose" type="checkbox">
+      </div>
+    </details>
+
+    <div class="actions">
+      <button id="connect" type="button">连接</button>
+      <button id="disconnect" class="secondary" type="button" disabled>断开</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+const fields = [
+  "server", "username", "password", "mac", "host_ip",
+  "host_name", "primary_dns", "dhcp_server", "bind_ip",
+  "control_check_status", "adapter_num", "ip_dog",
+  "auth_version", "keep_alive_version",
+];
+const boolFields = ["is_test", "unlimited_retry", "verbose"];
+
+let disconnecting = false;
+
+function setMessage(text) {
+  $("message").textContent = text || "";
+}
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = null; }
+  if (!response.ok) {
+    const message = data && data.error ? data.error : text || response.statusText;
+    throw new Error(message);
+  }
+  return data;
+}
+
+async function loadDefaults() {
+  const d = await api("/api/defaults");
+  for (const key of ["host_name", "primary_dns", "dhcp_server", "bind_ip",
+                     "control_check_status", "adapter_num", "ip_dog",
+                     "auth_version", "keep_alive_version"]) {
+    $(key).value = d[key];
+  }
+  $("is_test").checked = !!d.is_test;
+  $("unlimited_retry").checked = !!d.unlimited_retry;
+}
+
+async function loadAdapters() {
+  const select = $("adapter");
+  const adapters = await api("/api/adapters");
+  select.innerHTML = "";
+  if (!adapters.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "没有找到可用网卡";
+    select.appendChild(option);
+    $("connect").disabled = true;
+    return;
+  }
+  for (const adapter of adapters) {
+    const option = document.createElement("option");
+    const ipv4 = adapter.ipv4 && adapter.ipv4[0] ? adapter.ipv4[0] : "";
+    option.value = adapter.mac || "";
+    option.dataset.ipv4 = ipv4;
+    option.textContent = `${adapter.name} — ${adapter.mac || "无 MAC"}${ipv4 ? " — " + ipv4 : ""}`;
+    select.appendChild(option);
+  }
+  onAdapterChange();
+  $("connect").disabled = false;
+}
+
+function onAdapterChange() {
+  const select = $("adapter");
+  const option = select.options[select.selectedIndex];
+  if (!option) return;
+  $("mac").value = option.value || "";
+  $("host_ip").value = option.dataset.ipv4 || "";
+}
+
+async function loadSavedConfig() {
+  const saved = await api("/api/config");
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
+
+  for (const key of fields) {
+    if (saved[key] !== undefined && saved[key] !== null && saved[key] !== "") {
+      $(key).value = saved[key];
+    }
+  }
+  for (const key of boolFields) {
+    if (saved[key] !== undefined && saved[key] !== null) {
+      $(key).checked = !!saved[key];
+    }
+  }
+
+  const select = $("adapter");
+  if (saved.mac) {
+    for (let i = 0; i < select.options.length; i++) {
+      if (select.options[i].value === saved.mac) {
+        select.selectedIndex = i;
+        break;
+      }
+    }
+  }
+}
+
+async function onConnect() {
+  setMessage("");
+  const payload = {};
+  for (const key of fields) {
+    payload[key] = $(key).value;
+  }
+  for (const key of boolFields) {
+    payload[key] = $(key).checked;
+  }
+
+  $("connect").disabled = true;
+  try {
+    await api("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setMessage("");
+  } catch (error) {
+    setMessage(error.message);
+    $("connect").disabled = false;
+  }
+  pollStatus();
+}
+
+async function onDisconnect() {
+  setMessage("");
+  disconnecting = true;
+  $("disconnect").disabled = true;
+  try {
+    await api("/api/logout", { method: "POST" });
+  } catch (error) {
+    setMessage(error.message);
+  }
+  pollStatus();
+}
+
+function renderStatus(status) {
+  const text = $("status-text");
+  const extra = $("status-extra");
+  text.className = "status-text";
+
+  if (status.running && status.stop_requested) {
+    text.textContent = "正在断开…";
+    text.classList.add("bad");
+  } else if (status.running) {
+    text.textContent = "已连接";
+    text.classList.add("ok");
+  } else if (status.error) {
+    text.textContent = "已停止";
+    text.classList.add("bad");
+  } else {
+    text.textContent = "未连接";
+  }
+
+  extra.textContent = status.running ? `已运行 ${status.elapsed_secs} 秒` : "";
+  setMessage(status.error || "");
+
+  if (!status.running) {
+    disconnecting = false;
+  }
+
+  $("connect").disabled = status.running;
+  $("disconnect").disabled = !status.running || status.stop_requested || disconnecting;
+}
+
+async function pollStatus() {
+  try {
+    const status = await api("/api/status");
+    renderStatus(status);
+  } catch (error) {
+    setMessage(error.message);
+  }
+}
+
+for (const key of fields) {
+  $(key).addEventListener("input", () => setMessage(""));
+}
+
+$("adapter").addEventListener("change", onAdapterChange);
+$("refresh-adapters").addEventListener("click", () => loadAdapters().catch((e) => setMessage(e.message)));
+$("connect").addEventListener("click", onConnect);
+$("disconnect").addEventListener("click", onDisconnect);
+
+(async function init() {
+  try {
+    await loadDefaults();
+  } catch (error) {
+    setMessage(error.message);
+  }
+  try {
+    await loadAdapters();
+  } catch (error) {
+    setMessage(error.message);
+  }
+  try {
+    await loadSavedConfig();
+  } catch (error) {
+    setMessage(error.message);
+  }
+  pollStatus();
+  setInterval(pollStatus, 1000);
+})();
+</script>
+</body>
+</html>

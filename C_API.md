@@ -30,7 +30,16 @@ void        drcom_string_free(char *s);
 
 /* 客户端生命周期 */
 drcom_client *drcom_client_from_file(const char *config_path);
+drcom_client *drcom_client_new_from_toml(const char *toml_text);
 void          drcom_client_free(drcom_client *client);
+
+/* 网卡枚举 */
+typedef struct drcom_adapter_info {
+    char name[256];
+    char mac[32];
+    char ipv4[16];
+} drcom_adapter_info;
+int drcom_adapters_list(drcom_adapter_info *out, int capacity);
 
 /* 运行控制 */
 void drcom_client_set_verbose(drcom_client *client, int verbose);
@@ -103,6 +112,51 @@ clang example.c -Iinclude -Ltarget/release -ldrcom -o example
 > 运行时需确保动态库可被找到：Windows 将 `drcom.dll` 放到 exe 同目录；
 > Linux 设置 `LD_LIBRARY_PATH`；macOS 设置 `DYLD_LIBRARY_PATH`。
 
+## 从 TOML 字符串创建客户端
+
+如果不想先写配置文件，可以直接把 TOML 内容传给 `drcom_client_new_from_toml()`：
+
+```c
+const char *toml =
+    "server = \"10.100.61.3\"\n"
+    "username = \"your_username\"\n"
+    "password = \"your_password\"\n"
+    "host_ip = \"192.168.1.2\"\n"
+    "mac = \"AA:BB:CC:DD:EE:FF\"\n";
+
+drcom_client *c = drcom_client_new_from_toml(toml);
+if (!c) {
+    fprintf(stderr, "create failed: %s\n", drcom_last_error());
+}
+```
+
+可选字段（`host_name`、`primary_dns`、`bind_ip` 等）可以省略，库会使用默认值。
+
+## 枚举网卡 / MAC
+
+`drcom_adapters_list()` 返回可用于认证的本机网卡，已排除 loopback 和无 MAC 的接口：
+
+```c
+drcom_adapter_info adapters[16];
+int count = drcom_adapters_list(adapters, 16);
+if (count < 0) {
+    fprintf(stderr, "list failed: %s\n", drcom_last_error());
+}
+
+for (int i = 0; i < count && i < 16; i++) {
+    printf("%s %s %s\n", adapters[i].name, adapters[i].mac, adapters[i].ipv4);
+}
+```
+
+也可以先传 `NULL, 0` 查询数量，再按需分配：
+
+```c
+int count = drcom_adapters_list(NULL, 0);
+```
+
+返回的 `count` 是实际找到的网卡总数，可能大于 `capacity`；此时只有前 `capacity`
+个元素被填充。MAC 和 IPv4 字段可能为空字符串；名称过长时会被截断。
+
 ## 从其他线程停止
 
 `drcom_client_run()` 会阻塞直到收到停止请求。典型用法是在一个线程运行，
@@ -134,18 +188,33 @@ int main(void) {
 }
 ```
 
+> `drcom_client_stop()` 在登录阶段也会生效：如果还没登录成功，`drcom_client_run()`
+> 会在一次 UDP 读超时（约 3 秒）后返回 `0`，不会发送注销报文；如果已经登录成功，
+> 则先发送注销报文再返回。
+
 ## C# 调用示例
 
 ```csharp
 using System;
 using System.Runtime.InteropServices;
 
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+struct DrcomAdapterInfo {
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string Name;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]  public string Mac;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 16)]  public string Ipv4;
+}
+
 static class Drcom {
     [DllImport("drcom.dll")] public static extern IntPtr drcom_client_from_file(string path);
+    [DllImport("drcom.dll", CharSet = CharSet.Ansi)]
+    public static extern IntPtr drcom_client_new_from_toml(string toml);
     [DllImport("drcom.dll")] public static extern int drcom_client_run(IntPtr c);
     [DllImport("drcom.dll")] public static extern int drcom_client_stop(IntPtr c);
     [DllImport("drcom.dll")] public static extern void drcom_client_free(IntPtr c);
     [DllImport("drcom.dll")] public static extern IntPtr drcom_last_error();
+    [DllImport("drcom.dll")]
+    public static extern int drcom_adapters_list([Out] DrcomAdapterInfo[] adapters, int capacity);
 }
 
 // 使用：
@@ -154,6 +223,9 @@ static class Drcom {
 // ...
 // Drcom.drcom_client_stop(c);
 // Drcom.drcom_client_free(c);
+//
+// var adapters = new DrcomAdapterInfo[16];
+// int count = Drcom.drcom_adapters_list(adapters, adapters.Length);
 ```
 
 > 注意：`drcom_client_run` 是阻塞调用，在 C# 中应通过 `Task.Run` 放到线程池执行。
