@@ -30,6 +30,7 @@ pub struct Client {
     svr_addr: SocketAddr,
     verbose: bool,
     stop_flag: Arc<AtomicBool>,
+    logged_in: Arc<AtomicBool>,
 }
 
 impl Client {
@@ -55,6 +56,7 @@ impl Client {
             svr_addr,
             verbose: false,
             stop_flag: Arc::new(AtomicBool::new(false)),
+            logged_in: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -69,7 +71,9 @@ impl Client {
         self.verbose = verbose;
     }
 
-    /// 请求停止保活循环（线程安全，可从任意线程调用）。
+    /// 请求停止认证/保活流程（线程安全，可从任意线程调用）。
+    ///
+    /// 登录阶段最长需等待一次 UDP 读超时（3 秒）才会退出。
     pub fn request_stop(&self) {
         self.stop_flag.store(true, Ordering::SeqCst);
     }
@@ -77,6 +81,20 @@ impl Client {
     /// 是否已请求停止。
     pub fn is_stop_requested(&self) -> bool {
         self.stop_flag.load(Ordering::SeqCst)
+    }
+
+    /// 是否已经登录成功。
+    pub fn is_logged_in(&self) -> bool {
+        self.logged_in.load(Ordering::SeqCst)
+    }
+
+    /// 停止请求时返回 [`io::ErrorKind::Interrupted`]，供阻塞流程提前退出。
+    fn check_stop(&self) -> io::Result<()> {
+        if self.is_stop_requested() {
+            Err(io::Error::new(io::ErrorKind::Interrupted, "stop requested"))
+        } else {
+            Ok(())
+        }
     }
 
     /// 输出日志（仅在 verbose 模式下）。
@@ -109,20 +127,41 @@ impl Client {
 
     /// 运行认证与保活流程，直到收到停止请求。
     ///
-    /// 收到停止请求（[`request_stop`](Client::request_stop)）后发送注销报文并返回。
+    /// 登录前收到停止请求时直接返回 `Ok(())`；登录后收到停止请求时发送注销报文再返回。
+    /// 停止请求最长需等待一次 UDP 读超时（3 秒）才会生效。
     /// 该方法是阻塞的，适合由宿主程序在独立线程中调用。
     ///
     /// # Errors
     ///
     /// 当网络通信失败或服务器拒绝认证时返回 [`io::Error`]。
     pub fn run_until_stopped(&self) -> io::Result<()> {
-        let (salt, package_tail) = self.login()?;
+        let (salt, package_tail) = match self.login() {
+            Ok(v) => v,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted && self.is_stop_requested() => {
+                // 登录前被取消：还没有建立会话，不需要注销。
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
         self.empty_socket_buffer();
-        self.keep_alive1(&salt, &package_tail)?;
-        self.keep_alive2(&salt, &package_tail, &self.stop_flag)?;
+
+        let keepalive = (|| -> io::Result<()> {
+            self.keep_alive1(&salt, &package_tail)?;
+            self.keep_alive2(&salt, &package_tail, &self.stop_flag)?;
+            Ok(())
+        })();
+
+        if let Err(e) = keepalive {
+            if e.kind() == io::ErrorKind::Interrupted && self.is_stop_requested() {
+                // 登录后被取消：继续走注销流程。
+            } else {
+                return Err(e);
+            }
+        }
 
         // 如果收到停止信号，执行注销
-        if self.stop_flag.load(Ordering::SeqCst) {
+        if self.is_stop_requested() {
             println!("\n正在注销...");
             self.logout()?;
             println!("注销完成。");
@@ -196,6 +235,8 @@ impl Client {
 
     fn challenge(&self, ran: u64) -> io::Result<[u8; 4]> {
         loop {
+            self.check_stop()?;
+
             let ran_bytes = (ran as u16).to_le_bytes();
             let mut packet = vec![0x01, 0x02];
             packet.extend_from_slice(&ran_bytes);
@@ -220,8 +261,17 @@ impl Client {
                     salt.copy_from_slice(&data[4..8]);
                     return Ok(salt);
                 }
-                Err(_) => {
+                Err(e)
+                    if e.kind() == io::ErrorKind::WouldBlock
+                        || e.kind() == io::ErrorKind::TimedOut =>
+                {
                     self.log("[challenge] timeout, retrying...");
+                    self.check_stop()?;
+                    continue;
+                }
+                Err(e) => {
+                    self.log(&format!("[challenge] recv error: {e}, retrying..."));
+                    self.check_stop()?;
                     continue;
                 }
             }
@@ -237,12 +287,20 @@ impl Client {
         let salt = self.challenge(ran)?;
         self.log(&format!("[salt] {}", Self::hex(&salt)));
 
+        self.check_stop()?;
+
         let packet = mkpkt(&salt, username, password, mac, &self.config)?;
         self.log(&format!("[login] send {}", Self::hex(&packet)));
         self.socket.send_to(&packet, self.svr_addr)?;
 
         let mut buf = [0u8; RECV_BUF_SIZE];
-        let (len, addr) = self.socket.recv_from(&mut buf)?;
+        let (len, addr) = match self.socket.recv_from(&mut buf) {
+            Ok(v) => v,
+            Err(e) => {
+                self.check_stop()?;
+                return Err(e);
+            }
+        };
         let data = &buf[..len];
         self.log(&format!("[login] recv {}", Self::hex(data)));
 
@@ -253,6 +311,7 @@ impl Client {
             return Err(io::Error::other("login failed"));
         }
         self.log("[login] logged in");
+        self.logged_in.store(true, Ordering::SeqCst);
 
         let mut tail = [0u8; 16];
         if data.len() >= 39 {
@@ -278,7 +337,14 @@ impl Client {
 
         let mut buf = [0u8; RECV_BUF_SIZE];
         loop {
-            let (len, _) = self.socket.recv_from(&mut buf)?;
+            self.check_stop()?;
+            let (len, _) = match self.socket.recv_from(&mut buf) {
+                Ok(v) => v,
+                Err(e) => {
+                    self.check_stop()?;
+                    return Err(e);
+                }
+            };
             let recv = &buf[..len];
             self.log(&format!("[keep_alive1] recv {}", Self::hex(recv)));
             if !recv.is_empty() && recv[0] == 7 {

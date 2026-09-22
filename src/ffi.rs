@@ -131,6 +131,26 @@ pub unsafe extern "C" fn drcom_client_from_file(config_path: *const c_char) -> *
     })
 }
 
+/// 从 TOML 字符串创建客户端（不经过配置文件）。
+///
+/// `toml_text` 的内容与 `drcom.toml` 相同，可选字段可省略并使用默认值。
+/// 成功返回句柄，失败返回 NULL（可用 [`drcom_last_error`] 查看原因）。
+///
+/// # Safety
+///
+/// `toml_text` 必须是有效的 NUL 结尾 UTF-8 字符串。
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn drcom_client_new_from_toml(toml_text: *const c_char) -> *mut DrcomClient {
+    guard(ptr::null_mut(), || {
+        let text = unsafe { cstr_to_str(toml_text) }?;
+        let config: Config =
+            toml::from_str(text).map_err(|e| format!("failed to parse config: {e}"))?;
+        let client = Client::new(config).map_err(|e| format!("failed to create client: {e}"))?;
+        clear_last_error();
+        Ok(Box::into_raw(Box::new(DrcomClient { inner: client })))
+    })
+}
+
 /// 设置是否输出详细报文日志。
 ///
 /// # Safety
@@ -308,4 +328,81 @@ pub unsafe extern "C" fn drcom_checksum(data: *const u8, len: usize, out: *mut u
         ptr::copy_nonoverlapping(chk.as_ptr(), out, chk.len());
     }
     0
+}
+
+/// `drcom_adapter_info.name` 的缓冲区长度。
+pub const DRCOM_ADAPTER_NAME_LEN: usize = 256;
+/// `drcom_adapter_info.mac` 的缓冲区长度。
+pub const DRCOM_ADAPTER_MAC_LEN: usize = 32;
+/// `drcom_adapter_info.ipv4` 的缓冲区长度。
+pub const DRCOM_ADAPTER_IPV4_LEN: usize = 16;
+
+/// 单个网卡信息的 C 结构体。
+///
+/// 字段均为以 NUL 结尾的 UTF-8 字符串；名称过长时会被截断。
+#[repr(C)]
+pub struct DrcomAdapterInfo {
+    pub name: [c_char; DRCOM_ADAPTER_NAME_LEN],
+    pub mac: [c_char; DRCOM_ADAPTER_MAC_LEN],
+    pub ipv4: [c_char; DRCOM_ADAPTER_IPV4_LEN],
+}
+
+fn write_cstr(dst: &mut [c_char], src: &str) {
+    let bytes = src.as_bytes();
+    let max = dst.len().saturating_sub(1);
+    let n = bytes.len().min(max);
+    for (i, &b) in bytes[..n].iter().enumerate() {
+        dst[i] = b as c_char;
+    }
+    dst[n] = 0;
+}
+
+/// 列出可用于认证的本机网卡（排除 loopback 和无 MAC 的接口）。
+///
+/// `out` 是调用方提供的数组，`capacity` 是元素个数。
+/// 返回找到的网卡总数（可能大于 `capacity`），失败返回 `-1`。
+/// 若 `out` 为 NULL 且 `capacity` 为 0，则只返回数量。
+/// 每个字段均以 NUL 结尾；名称过长时会被截断。
+///
+/// # Safety
+///
+/// `out` 必须指向至少 `capacity` 个 [`DrcomAdapterInfo`] 的可写内存，
+/// 或者为 NULL（此时 `capacity` 必须为 0）。
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn drcom_adapters_list(out: *mut DrcomAdapterInfo, capacity: c_int) -> c_int {
+    guard(-1, || {
+        if capacity < 0 {
+            return Err("negative capacity".to_string());
+        }
+        if out.is_null() && capacity != 0 {
+            return Err("null output with non-zero capacity".to_string());
+        }
+
+        let adapters =
+            crate::netif::usable_adapters().map_err(|e| format!("failed to list adapters: {e}"))?;
+        let total = adapters.len();
+
+        if out.is_null() {
+            clear_last_error();
+            return Ok(total as c_int);
+        }
+
+        let cap = capacity as usize;
+        let slots = unsafe { std::slice::from_raw_parts_mut(out, cap) };
+        for (slot, adapter) in slots.iter_mut().zip(adapters.iter()) {
+            *slot = DrcomAdapterInfo {
+                name: [0; DRCOM_ADAPTER_NAME_LEN],
+                mac: [0; DRCOM_ADAPTER_MAC_LEN],
+                ipv4: [0; DRCOM_ADAPTER_IPV4_LEN],
+            };
+            write_cstr(&mut slot.name, &adapter.name);
+            write_cstr(&mut slot.mac, adapter.mac.as_deref().unwrap_or(""));
+            write_cstr(
+                &mut slot.ipv4,
+                adapter.ipv4.first().map(String::as_str).unwrap_or(""),
+            );
+        }
+        clear_last_error();
+        Ok(total as c_int)
+    })
 }

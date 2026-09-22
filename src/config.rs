@@ -90,6 +90,29 @@ fn default_unlimited_retry() -> bool {
     true
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            server: String::new(),
+            username: String::new(),
+            password: String::new(),
+            host_ip: String::new(),
+            mac: String::new(),
+            host_name: default_host_name(),
+            primary_dns: default_primary_dns(),
+            dhcp_server: default_dhcp_server(),
+            bind_ip: default_bind_ip(),
+            control_check_status: default_control_check_status(),
+            adapter_num: default_adapter_num(),
+            ip_dog: default_ip_dog(),
+            auth_version: default_auth_version(),
+            keep_alive_version: default_keep_alive_version(),
+            is_test: default_is_test(),
+            unlimited_retry: default_unlimited_retry(),
+        }
+    }
+}
+
 impl Config {
     /// 从 TOML 文件加载配置。
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {

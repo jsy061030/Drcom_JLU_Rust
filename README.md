@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/build.yml/badge.svg)](https://github.com/jsy061030/Drcom_JLU_Rust/actions/workflows/build.yml)
 
-Dr.COM 校园网认证客户端的 Rust 重写版本，提供**可执行文件**、**Rust 库**和 **C 库**三种形式。
+Dr.COM 校园网认证客户端的 Rust 重写版本，提供**可执行文件**、**Rust 库**和 **C 库**三种形式，并附带本地 WebUI 和托盘常驻程序。
 
 ## 功能
 
@@ -14,11 +14,15 @@ Dr.COM 校园网认证客户端的 Rust 重写版本，提供**可执行文件**
 - 跨平台（Windows / Linux / macOS）
 - **Rust 库接口**（crate `drcom`）：可集成到其他 Rust 项目
 - **C ABI 接口**（`cdylib` / `staticlib`）：可被 C/C++/C#/Python 等调用
+- **WebUI**：单一可执行文件，内嵌原生 HTML，支持账号密码输入与 MAC 下拉选择
+- **托盘常驻**：`drcom-tray` 把 WebUI 和托盘图标放在同一进程；左键打开网页，右键菜单退出
 
 ## 项目结构
 
 本项目同时产出：
 - **可执行文件** `drcom-client`：命令行客户端
+- **可执行文件** `drcom-web`：本地 WebUI，内嵌 `web/index.html`
+- **可执行文件** `drcom-tray`：托盘常驻程序，内嵌同一个 WebUI
 - **Rust 库** `drcom`（rlib）：可嵌入其他 Rust 应用
 - **C 库** `drcom.dll` / `drcom.lib` / `libdrcom.so` / `libdrcom.a`：C ABI，配套头文件 `include/drcom.h`
 
@@ -31,6 +35,11 @@ Dr.COM 校园网认证客户端的 Rust 重写版本，提供**可执行文件**
 - `md-5`: MD5 哈希
 - `rand`: 随机数生成
 - `serde` + `toml`: 配置文件解析
+- `network-interface`: 跨平台网卡枚举
+- `tiny_http`: WebUI 用的本地 HTTP 服务
+- `serde_json`: WebUI JSON 接口
+- `webbrowser`: 启动 WebUI 后自动打开浏览器
+- `tao` + `tray-icon`: 托盘常驻程序（Linux 下需要 GTK/AppIndicator，见 tray-icon 文档）
 
 ## 构建
 
@@ -43,6 +52,8 @@ cargo build --release
 | 文件 | 说明 |
 |------|------|
 | `drcom-client.exe` / `drcom-client` | 命令行客户端 |
+| `drcom-web.exe` / `drcom-web` | 本地 WebUI（内嵌 HTML，单文件） |
+| `drcom-tray.exe` / `drcom-tray` | 托盘常驻程序（内嵌 WebUI） |
 | `drcom.dll` / `libdrcom.so` / `libdrcom.dylib` | C 动态库（cdylib） |
 | `drcom.dll.lib` | Windows 动态库导入库 |
 | `drcom.lib` / `libdrcom.a` | C 静态库（staticlib） |
@@ -87,6 +98,52 @@ cargo run --release -- /path/to/config.toml
 - 按 `q` 键 → 程序询问是否注销；
 - 再按 `y` 键 → 发送注销报文并退出；
 - 输入其他内容 → 取消注销，继续保活。
+
+## WebUI
+
+`drcom-web` 是一个单一可执行文件：页面和资源全部内嵌，启动后在本机监听随机端口
+并自动打开浏览器。
+
+```bash
+cargo build --release
+./target/release/drcom-web
+
+# 指定端口、不自动打开浏览器
+./target/release/drcom-web --port 8080 --no-open
+```
+
+功能：
+
+- 输入账号、密码、认证服务器
+- 从下拉框选择网卡，自动填入 MAC 和当前 IPv4
+- 高级选项可展开修改 `host_name`、`bind_ip`、`auth_version` 等协议字段
+- 连接 / 断开按钮，状态区显示运行时长和最后一次错误
+- 登录阶段点“断开”也能取消，最多等一次 3 秒 UDP 读超时
+
+> WebUI 只监听 `127.0.0.1`，默认不对外网开放。
+
+### 配置保存
+
+- 登录成功后会**自动保存**当前表单的全部字段到 `~/.drcomconfig`；
+- 打开页面时会**自动读取**该文件并填充表单；
+- 密码用简单 XOR 混淆，key 为 MAC 去掉冒号/横线后的字符串。
+
+> 这只是混淆，不是强加密；换网卡（MAC 变化）后旧密码无法解密，需要重新输入。
+
+## 托盘常驻
+
+`drcom-tray` 把 WebUI 服务和托盘图标放在同一个进程里：
+
+- **左键单击托盘图标**：用默认浏览器打开 WebUI
+- **右键单击托盘图标**：弹出菜单
+  - 打开 WebUI
+  - 退出
+
+```bash
+./target/release/drcom-tray
+```
+
+> 托盘进程退出会同时结束 WebUI 和保活线程。如果当前正在认证，建议先在页面上点“断开”再退出。
 
 ## 配置说明
 
