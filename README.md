@@ -173,29 +173,6 @@ cargo build --release
 | `is_test` | `true` | 测试模式 |
 | `unlimited_retry` | `true` | 无限重试 |
 
-## 与原版差异
-
-1. **配置方式**: 原版使用硬编码或 Python `exec()` 加载配置；本版本使用 TOML。
-2. **文件日志**: 原版在非 Windows 平台写入文件（但有 bug）；本版本仅输出到控制台。
-3. **网卡绑定**: 原版在 Unix 下支持 `fcntl` 绑定指定网卡；本版本仅使用 `bind_ip` 参数。
-4. **错误处理**: 本版本使用 Rust 标准错误类型，提供清晰的错误信息。
-
-## 实现说明（重要）
-
-### 校验和的"正则怪癖"已刻意保留
-
-原脚本的 `checksum()` 用 `re.findall(b'....', s)` 做 4 字节分块，而 Python 正则中的
-`.` **默认不匹配换行字节 `0x0A`**。由于 `primary_dns = 10.10.10.10` 会产生 `0a 0a 0a 0a`，
-这会让扫描位置右移重新对齐，结果与"固定 4 字节分组"**不同**。
-
-本实现（Rust 与 C#）为与原客户端逐字节一致，**故意复刻**了这一行为。
-若你的服务器并不校验该字段，两种算法都可用；若需改为标准 4 字节分组，请修改
-`src/protocol.rs` 的 `checksum()`（C# 对应 `Protocol.Checksum`）。
-
-### 报文一致性
-
-Rust / C# 实现的 `md5sum`、`dump`、`checksum`、`mkpkt`、`keep_alive_package_builder`
-输出已与原 Python 脚本逐字节比对通过（相同输入 → 完全相同的报文）。
 
 ## 跨平台构建
 
